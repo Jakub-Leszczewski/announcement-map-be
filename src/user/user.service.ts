@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,7 +8,12 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { FindOptionsWhere } from 'typeorm';
-import { GetUserResponse, UserSaveResponseData } from '../types';
+import {
+  CreateUserResponse,
+  GetUserResponse,
+  UserSaveResponseData,
+} from '../types';
+import { createHashPwd } from '../common/utils/create-hash-pwd';
 
 @Injectable()
 export class UserService {
@@ -15,12 +21,23 @@ export class UserService {
     return User.findOne({ where });
   }
 
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
-  }
+  async create(createUserDto: CreateUserDto): Promise<CreateUserResponse> {
+    await this.checkUserFieldUniquenessAndThrow({
+      email: createUserDto.email,
+    });
+    await this.checkUserFieldUniquenessAndThrow({
+      username: createUserDto.username,
+    });
 
-  findAll() {
-    return `This action returns all user`;
+    const user = new User();
+    user.firstName = createUserDto.firstName;
+    user.lastName = createUserDto.lastName;
+    user.username = createUserDto.username;
+    user.email = createUserDto.email;
+    user.hashPwd = await createHashPwd(createUserDto.password);
+    await user.save();
+
+    return this.filter(user);
   }
 
   async findOne(id: string): Promise<GetUserResponse> {
@@ -38,6 +55,25 @@ export class UserService {
 
   remove(id: number) {
     return `This action removes a #${id} user`;
+  }
+
+  async checkUserFieldUniquenessAndThrow(value: {
+    [key: string]: any;
+  }): Promise<void> {
+    const isUniqueness = await this.checkUserFieldUniqueness(value);
+
+    const [key] = Object.keys(value);
+    if (!isUniqueness) throw new ConflictException(`${key} is not unique`);
+  }
+
+  async checkUserFieldUniqueness(value: {
+    [key: string]: any;
+  }): Promise<boolean> {
+    const user = await User.findOne({
+      where: value,
+    });
+
+    return !user;
   }
 
   filter(userEntity: User): UserSaveResponseData {

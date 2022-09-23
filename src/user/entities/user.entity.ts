@@ -1,6 +1,13 @@
-import { BaseEntity, Column, Index, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  BaseEntity,
+  Column,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { UserInterface } from '../../types';
 
+@Entity()
 export class User extends BaseEntity implements UserInterface {
   @PrimaryGeneratedColumn('uuid')
   public id: string;
